@@ -1,0 +1,91 @@
+- name: Uninstall previous Docker
+  apt:
+    name:
+      - docker
+      - docker-engine
+      - docker.io
+      - containerd
+      - runc
+    state: absent
+
+- name: Create Directory
+  file:
+    path: /home/EarlV/docker-deb
+    state: directory
+
+- name: Download Components
+  get_url:
+    url: "https://download.docker.com/linux/ubuntu/dists/jammy/pool/stable/amd64/{{ item }}"
+    dest: /home/EarlV/docker-deb
+  with_items:
+    - containerd.io_1.6.9-1_amd64.deb
+    - docker-ce-cli_20.10.21~3-0~ubuntu-jammy_amd64.deb
+    - docker-ce_20.10.21~3-0~ubuntu-jammy_amd64.deb
+    - docker-compose-plugin_2.6.0~ubuntu-jammy_amd64.deb
+
+- name: Install Components
+  shell:
+    cd /home/EarlV/docker-deb
+    dpkg -i "{{ item }}"
+  with_items:
+    - containerd.io_1.6.9-1_amd64.deb
+    - docker-ce-cli_20.10.21~3-0~ubuntu-jammy_amd64.deb
+    - docker-ce_20.10.21~3-0~ubuntu-jammy_amd64.deb
+    - docker-compose-plugin_2.6.0~ubuntu-jammy_amd64.deb
+
+- name: Fixing Errors
+  shell: chmod 666 /var/run/docker.sock
+
+- name: Ensuring Docker
+  group:
+    name: docker
+    state: present
+
+- name: Adding Docker to User
+  user:
+    name: EarlV
+    group: docker
+    append: yes
+
+- name: Start Service
+  service:
+    name: "{{ item }}"
+    state: started
+  with_items:
+    - docker
+    - containerd
+
+- name: Install Python
+  apt:
+    name: python3-pip
+
+- name: Install Python sdk
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  pip:
+    name:
+      - docker
+      - docker-compose
+
+- block:
+  - name: Verify Docker Service
+    shell: systemctl list-unit-files | grep docker
+    register: docker_service
+
+  - debug:
+      msg="{{ docker_service }}"
+
+- block:
+  - name: Verify User Groups
+    shell: groups EarlV
+    register: user_groups
+
+  - debug:
+      msg="{{ user_groups }}"
+
+- block:
+  - name: Verify Install
+    shell: docker --version
+    register: docker_installation
+
+  - debug:
+      msg="{{ docker_installation }}"
